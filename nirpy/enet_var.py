@@ -1,5 +1,5 @@
 from sklearn.linear_model import ElasticNetCV, ElasticNet
-from import_Module import sel_wavs
+
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import cross_val_predict
 import matplotlib.pyplot as plt
@@ -175,56 +175,9 @@ class Enet_Select(TransformerMixin, RegressorMixin, BaseEstimator):
     def get_vars(self):
         return self.X_sel, self.y_sel, self.wl_sel
 
-    def transform_feats(self,func=sel_wavs, specs = None, lab = None):
-
-        self.X_sel, self.y_sel, self.wl_sel = sel_wavs(specs, lab, self.sel_feats)
-
-        return self.X_sel, self.y_sel, self.wl_sel
+    
 
 
-
-
-
-def enet_var_sel(X, y, wl):
-    cv_model = ElasticNetCV(l1_ratio=[.01, .1, .5, .7, .9, .95, .99, .995, 1], eps=0.001, n_alphas=100, fit_intercept=True,
-                            normalize=True, precompute='auto', max_iter=20000, tol=0.0001, cv=5,
-                            copy_X=True, verbose=0, n_jobs=-1, positive=False, random_state=None, selection='cyclic')
-
-
-    cv_model.fit(X, y)
-
-    print('Optimal l1_ratio: %.3f'%cv_model.l1_ratio_)
-    print('Number of iterations %d'%cv_model.n_iter_)
-
-    # train model with best l1_ratio from CV
-    model = ElasticNet(l1_ratio=cv_model.l1_ratio_, alpha = cv_model.alpha_, max_iter=cv_model.n_iter_, fit_intercept=True, normalize = True)
-    model.fit(X, y)
-
-    print(r2_score(y, model.predict(X)))
-
-    feature_importance = pd.Series(index = specs.columns[1:], data = np.abs(model.coef_))
-
-    n_selected_features = (feature_importance>0).sum()
-    print('{0:d} features, reduction of {1:2.2f}%'.format(
-        n_selected_features,(1-n_selected_features/len(feature_importance))*100))
-
-    feature_importance.sort_values().tail(600).plot(kind = 'bar', figsize = (18,6))
-
-    sel_feats = feature_importance.sort_values().tail(n_selected_features).index.astype(str)
-
-    # get indices of feature importance
-    sorted_ixx = feature_importance.argsort()
-    # sort wavenumbers according to feature importance
-    Xc = X[:,sorted_ixx]
-    #features to be dicarded
-    n_rem = wl.shape[0] - n_selected_features
-    X_sel = Xc[:, n_rem:]
-
-    return X_sel, y
-
-    # X, y, wl = sel_wavs(specs, lab, sel_feats)
-    #
-    # return X, y, wl
 
 def enet_cv(X, y, X_test = None, y_test = None):
 

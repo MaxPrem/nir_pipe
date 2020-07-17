@@ -1,10 +1,19 @@
+# %%
 # from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.pipeline import Pipeline
+#########################
+# scaling and transformingfrom ChemUtils import EmscScaler, GlobalStandardScaler, SavgolFilter
+from sklearn.cross_decomposition import PLSRegression
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
 
+from ChemUtils import EmscScaler, GlobalStandardScaler, SavgolFilter
+from enet_var import Enet_Select
+from ImportModule import cut_specs, importLuzCol
+from pls_utils import Outlier, PLSOptimizer, pls_cv, pls_opt_cv
+from validation_utils import da_func_ncv
 
 #import
 
@@ -13,9 +22,8 @@ specs = pd.read_csv('/Users/maxprem/nirPy/calData_full.csv') # full spectra
 lab = pd.read_excel('/Users/maxprem/nirGit/nirpy/luzrawSpectra/labData.xlsx')
 
 
+# %%
 
-
-from import_Module import importLuzCol, cut_specs
 
 # input wavenumber to cut spectra
 specs = cut_specs(specs, 4100, 5500)
@@ -26,24 +34,12 @@ specs = cut_specs(specs, 4100, 5500)
 X, y, wl, ref = importLuzCol(specs, lab, 4)
 
 
-y_df =pd.DataFrame(y)
-y_df.hist(bins=20)
-y_df.boxplot()
-
-
-from ChemUtils import EmscScaler, GlobalStandardScaler, SavgolFilter
-from pls_utils import pls_opt_cv, pls_cv
 
 # splitting dataset
 """to be continued with test set"""
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 
-#########################
-# scaling and transformingfrom ChemUtils import EmscScaler, GlobalStandardScaler, SavgolFilter
-from sklearn.cross_decomposition import  PLSRegression
-from pls_utils import PLSOptimizer, Outlier
-from enet_var import Enet_Select
 
 
 # scale y
@@ -84,9 +80,7 @@ X_test = pipeline.transform(X_test)
 # %% codecell
 
 model = pls_opt_cv(X_train, y_train, 9)
-model
 
-from validation_utils import da_func_ncv
 
 da_func_ncv(X_train, y_train, X_test, y_test,y, ref, model)
 
@@ -157,4 +151,4 @@ da_func_ncv(X_train, y_train, X_test, y_test,y, ref, model)
 #
 
 
-
+# %%

@@ -2,24 +2,41 @@
 # First demo DeepLearning
 
 
-# %%codecell
-import numpy as np
-import pandas as pd
+# Set directory for model callbacks to be saved
+# %% 
+import os
+import time
+
 import matplotlib.pyplot as plt
-import scipy.io as sio
+
 import numpy as np
 
+import pandas as pd
+import pkg_resources
+import scipy.io as sio
+import tensorflow as tf
 #tensorflow
 import tensorflow.keras as keras
-from tensorflow.keras.models import Sequential, save_model, load_model
-from tensorflow.keras.layers import Dense, Dropout, Flatten
-from tensorflow.keras.layers import Conv1D, Reshape, GaussianNoise, SeparableConv1D
-from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint
-import tensorflow as tf
-
 import tensorflow.keras.losses
-from tensorflow.keras import backend as K
+from keras.wrappers.scikit_learn import KerasRegressor
 
+from sklearn.model_selection import (cross_val_predict, cross_val_score,
+                                     train_test_split)
+from sklearn.pipeline import Pipeline
+from tensorflow.keras import backend as K
+from tensorflow.keras.callbacks import (EarlyStopping, ModelCheckpoint,
+                                        ReduceLROnPlateau)
+from tensorflow.keras.layers import (Conv1D, Dense, Dropout, Flatten,
+                                     GaussianNoise, Reshape, SeparableConv1D)
+from tensorflow.keras.models import Sequential, load_model, save_model
+
+# %% codecell
+from nirpy.ChemUtils import (Dataaugument, EmscScaler, GlobalStandardScaler,
+                             benchmark, huber, scaled_benchmark)
+from nirpy.DeepUtils import CustomStopper, HuberLoss, MCDropout
+from nirpy.import_Module import cut_specs, importLuzCol
+from nirpy.validation_utils import da_func, tensor_benchmark
+import tensorflow as tf
 assert tf.__version__ >= "2.0"
 print(tf.__version__)
 
@@ -30,7 +47,6 @@ print(tf.__version__)
 specs = pd.read_csv('/Users/maxprem/nirPy/calData_full.csv') # full
 lab = pd.read_excel('./nirpy/luzrawSpectra/labdata.xlsx')
 
-from nirpy.import_Module import importLuzCol, cut_specs
 
 specs = cut_specs(specs, 4100, 8000)
 
@@ -38,14 +54,10 @@ X, y, wl, ref = importLuzCol(specs, lab, 4)
 
 
 
-# %%codecell
-from sklearn.model_selection import train_test_split
 X, X_val, y, y_val = train_test_split(X, y, test_size=0.05, random_state=42)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
 
 
-from nirpy.ChemUtils import GlobalStandardScaler, Dataaugument, EmscScaler
-from sklearn.pipeline import Pipeline
 
 # %% codecell
 #
@@ -112,7 +124,6 @@ kernel_initializer = 'lecun_normal'
 
 #example: layer = keras.layers.Dense(10, activation="selu", kernel_initializer="lecun_normal")
 
-from nirpy.deep_utils import MCDropout, HuberLoss, CustomStopper
 
 
 
@@ -136,7 +147,6 @@ model = keras.models.Sequential([
 ###########################################     cross_validate   #######################################################
 ########################################################################################################################
 
-from sklearn.model_selection import cross_val_score
 
 ###################################################
 ######## model initialization as funciton #########
@@ -225,10 +235,6 @@ run_id_tensor_board = "run_%Y_%m_%d-%H_%M_%S_prot_XL"
 #**********#
 ############
 
-# Set directory for model callbacks to be saved
-import os
-import time
-import pkg_resources
 
 # tensorboard
 def get_run_logdir():
@@ -289,8 +295,6 @@ history = model.fit(X_aug, y_aug, epochs = 70, batch_size=16, validation_data=(X
 
 #model = keras.models.load_model("./dataaug_luz.h5"
 
-# %%codecell
-import pandas as pd
 with plt.style.context("ggplot"):
 	pd.DataFrame(history.history).plot()
 	plt.grid(True)
@@ -311,7 +315,6 @@ with plt.style.context("ggplot"):
 
 	plt.legend()
 
-from nirpy.ChemUtils import huber, benchmark
 
 benchmark(X_train, y_train, X_test, y_test, model)
 
@@ -328,7 +331,6 @@ with plt.style.context("ggplot"):
 	plt.plot([-2,3],[-2,3])
 	#plt.plot(y_test, y_test) # Y = PredY line
 
-from nirpy.validation_utils import tensor_benchmark
 # %% markdown
 # The "history" object returned by the training, contain the losses and learning rates from the training. The loss for the training and validation (here = Test) settles down when the lr is lowered. The model seems a bit overfit as the validation loss rises towards the end of training, maybe a higher dropout ratio could help.
 # %% codecell
@@ -352,12 +354,9 @@ reconstructed_model.compile(loss=HuberLoss(), optimizer = keras.optimizers.Nadam
 
 
 '''reconstructed_model'''
-#benchmark(X_train, y_train, X_test, y_test, reconstructed_model)
-from nirpy.validation_utils import da_func
 
 da_func2(X_train, y_train, X_test, y_test, model)
 
-from sklearn.model_selection import cross_val_predict
 
 def da_func2(X_train, y_train, X_test, y_test, model):
 	rmse = np.mean((y_train - model.predict(X_train).reshape(y_train.shape))**2)**0.5
@@ -483,10 +482,7 @@ with plt.style.context("ggplot"):
 
 
 
-# %% codecell
-from nirpy.ChemUtils import benchmark, scaled_benchmark, huber
 
-from keras.wrappers.scikit_learn import KerasRegressor
 
 
 # %% codecell

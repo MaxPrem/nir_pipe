@@ -72,6 +72,30 @@ def cut_specs(specs, start, stop, plot=True):
     return specs.loc[:,str(start):str(stop)]
 
 
+def cut_specs2(specs, start, stop, plot=True):
+    '''Cuts spectra by columnname'''
+
+    specs = specs.set_index[0].sort_index()
+
+    if start < stop:
+        stop, start = start, stop
+
+    X = specs.loc[:,str(start):str(stop)]
+
+    wl = X.columns.astype(int)
+
+    if plot == True:
+        fig = plt.figure(figsize=(8,6))
+        with plt.style.context(('ggplot')):
+            plt.plot(wl, X.T)
+            plt.xlabel('Wavenumber (cm-1)')
+            plt.ylabel('Absorbance spectra')
+            plt.show()
+            print("Spectra rangeing from", wl.max(), 'to', wl.min(), 'cm-1')
+
+    return specs.loc[:,str(start):str(stop)]
+
+
 # class DataLoader(object):
 #     """Spectra and Labvalues"""
 #     def __init__(self, spectra, lab_values, lab_col=1):
@@ -175,7 +199,8 @@ def sel_wavs(specs,lab,sel_feats, lab_col=4):
 
 if __name__ == '__main__':
 
-
+    import pandas as pd
+    import matplotlib.pyplot as plt
 
     #path
     specs = pd.read_csv('./luzrawSpectra/nirMatrix.csv')
@@ -187,7 +212,11 @@ if __name__ == '__main__':
     # ss = specs.loc[:,str(5000):str(4000)]
     # ss
 
+    specs.set_index(1)
     cut_specs = cut_specs(specs, 5000, 4000)
+    cut_specs2 = cut_specs(specs, 5000, 4000)
+
+
     specs.index
     cut_specs.index
 
@@ -199,7 +228,9 @@ if __name__ == '__main__':
 
     _ = plt.plot(-wl, X.T, )
 
+    specs.set_index(list(specs.columns[0]))
 
+    specs.iloc[:,0].set_index()
 
 
     #

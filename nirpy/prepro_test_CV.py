@@ -25,7 +25,7 @@ lab = pd.read_excel('./luzrawSpectra/labdata.xlsx')
 
 from import_Module import importLuzCol
 
-X, y, wl = importLuzCol(specs, lab, 4)
+X, y, wl, ref = importLuzCol(specs, lab, 4)
 
 X.shape
 
@@ -77,7 +77,7 @@ from sklearn.decomposition import PCA
 pca = PCA(n_components=4)
 model = pca.fit_transform(X)
 print(pca.explained_variance_ratio_)
-model.get_params()
+
 
 # fit a MCD robust estimator to data
 robust_cov = MinCovDet().fit(X)

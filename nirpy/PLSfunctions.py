@@ -443,26 +443,16 @@ def pls_opt_cv(X, y, n_comp = 10, plot_components=True):
     print("Suggested number of components: ", msemin+1)
     stdout.write("\n")
 
-    # if plot_components is True:
-    #     with plt.style.context(('ggplot')):
-    #         plt.plot(component, np.array(mse), '-v', color = 'blue',
-    #                   mfc='blue')
-    #         plt.plot(component[msemin], np.array(mse)[msemin], 'P', ms=10,
-    #                   mfc='red')
-    #         plt.xlabel('Number of PLS components')
-    #         plt.ylabel('MSE')
-    #         plt.title('PLS')
-    #         plt.xlim(left=-1)
-    #     plt.show()
-    #
     if plot_components is True:
         with plt.style.context(('ggplot')):
-            plt.plot(component, np.array(mse), '-v')
+            plt.plot(component, np.array(mse), '-v', color = 'blue',
+                      mfc='blue')
             plt.plot(component[msemin], np.array(mse)[msemin], 'P', ms=10,
                       mfc='red')
             plt.xlabel('Number of PLS components')
             plt.ylabel('MSE')
             plt.title('PLS')
+            plt.xlim(left=-1)
         plt.show()
 
         # Define PLS object with optimal number of components
