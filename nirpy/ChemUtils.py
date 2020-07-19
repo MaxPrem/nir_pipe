@@ -6,61 +6,21 @@ from scipy import newaxis as nA
 from scipy import linalg
 from scipy.signal import savgol_filter
 import pandas as pd
-from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer
 
 #Some metrics
 def huber(y_true, y_pred, delta=1.0):
+	'''calculates huber loss, a robust estimator for regression'''
 	y_true = y_true.reshape(-1,1)
 	y_pred = y_pred.reshape(-1,1)
 	return np.mean(delta**2*( (1+((y_true-y_pred)/delta)**2)**0.5 -1))
 
-
-def benchmark(X_train,y_train,X_test, y_test, model):
-
-	rmse = np.mean((y_train - model.predict(X_train).reshape(y_train.shape))**2)**0.5
-	rmse_test = np.mean((y_test - model.predict(X_test).reshape(y_test.shape))**2)**0.5
-	hub = huber(y_train, model.predict(X_train))
-	hub_test = huber(y_test, model.predict(X_test))
-	print ("RMSE  Train/Test\t%0.2F\t%0.2F"%(rmse, rmse_test))
-	print ("Huber Train/Test\t%0.4F\t%0.4F"%(hub, hub_test))
-
-
-#
-# def benchmark(X_train,y_train,X_test, y_test, model, X_val = None, y_val = None):
-#
-# 	def huber(y_true, y_pred, delta=1.0):
-# 		y_true = y_true.reshape(-1,1)
-# 		y_pred = y_pred.reshape(-1,1)
-# 		return np.mean(delta**2*( (1+((y_true-y_pred)/delta)**2)**0.5 -1))
-#
-#     rmse = np.mean((y_train - model.predict(X_train).reshape(y_train.shape))**2)**0.5
-#     rmse_test = np.mean((y_test - model.predict(X_test).reshape(y_test.shape))**2)**0.5
-#     hub = huber(y_train, model.predict(X_train))
-#     hub_test = huber(y_test, model.predict(X_test))
-#     print ("RMSE  Train/Test\t%0.2F\t%0.2F"%(rmse, rmse_test))
-#     print ("Huber Train/Test\t%0.4F\t%0.4F"%(hub, hub_test))
-
-
-def scaled_benchmark(X_train,y_train,X_test, y_test, model):
-	rmse = np.mean((y_train - model.predict(X_train).reshape(y_train.shape))**2)**0.5
-	rmse_test = np.mean((y_test - model.predict(X_test).reshape(y_test.shape))**2)**0.5
-	hub = huber(y_train, model.predict(X_train))
-	hub_test = huber(y_test, model.predict(X_test))
-	# transform
-	hub = yscaler.inverse_transform(hub)
-	hub_test = yscaler.inverse_transform(hub_test)
-	rmse = yscaler.inverse_transform(rmse)
-	rmse_test= yscaler.inverse_transform(rmse_test)
-	print ("RMSE  Train/Test\t%0.2F\t%0.2F"%(rmse, rmse_test))
-	print ("Huber Train/Test\t%0.4F\t%0.4F"%(hub, hub_test))
-
 def spec_mean_centering(X):
-	X_df = pd.DataFrame(X_train)
+	X_df = pd.DataFrame(X)
 	return X_df.subtract(X_df.mean()).values
 
 class SpectraMeanCenter():
-	"""Applies mean centering to spectra"""
+	"""Applies mean centering to spectra, to reduce baseline shift. Can amplify Noise"""
 	def __init__(self):
 		self.mean_spec = None
 		self._fitted = False
@@ -79,7 +39,7 @@ class SpectraMeanCenter():
 			print('Call .fit() first!')
 
 	def fit_transform(X):
-		X_df = pd.DataFrame(X_train)
+		X_df = pd.DataFrame(X)
 		return X_df.subtract(X_df.mean()).values
 
 
@@ -134,7 +94,7 @@ class GlobalStandardScaler(object):
 
 
 class SavgolFilter(FunctionTransformer):
-	'''Fit transform Input with Savgol Alogorithm'''
+	"""Performs Savgol smooting, by fitting a polynomial curve to a window of n wavelenghts"""
 	def __init__(self, window_length=13, polyorder=2, deriv=0):
 		# set parameters
 		self.window_length = window_length
@@ -258,99 +218,3 @@ class Dataaugument(object):
 		X = self.fit(X)
 		return self.augment(X)
 
-
-if __name__ == "__main__":
-	from sys import stdout
-	import numpy as np
-	import pandas as pd
-	import matplotlib.pyplot as plt
-	from scipy.signal import savgol_filter
-	from sklearn.cross_decomposition import PLSRegression
-	from sklearn.model_selection import cross_val_predict
-	from sklearn.metrics import mean_squared_error, r2_score
-	from sklearn.pipeline import Pipeline
-	from sklearn.model_selection import train_test_split
-
-
-	#specs = pd.read_csv('./luzrawSpectra/nirMatrix.csv') # cut spectra
-	specs = pd.read_csv('/Users/maxprem/nirPy/calData_full.csv') # full spectra
-	lab = pd.read_excel('./luzrawSpectra/labdata.xlsx')
-
-	from import_Module import importLuzCol
-
-	X, y, wl = importLuzCol(specs, lab, 4)
-
-	#from ChemUtils import EmscScaler, GlobalStandardScaler, SavgolFilter, MeanCenter
-
-
-
-	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42)
-	# scale y
-	yscaler = GlobalStandardScaler()
-	y_train = yscaler.fit_transform(y_train)
-	y_test = yscaler.transform(y_test)
-	y_train.mean()
-	#np.histogram(y_train)
-	y_test.mean()
-	#Extensive Multiplicative Scattercorrection
-	#plt.hist(y_train)
-	#plt.hist(y_test)
-
-
-	pipeline = Pipeline([
-		("scaleing_X", GlobalStandardScaler()),
-		("scatter_correction", EmscScaler()),
-		("smmothing", SavgolFilter(deriv=0))
-	])
-
-	pipe_mean = Pipeline([
-		("scatter_correction", EmscScaler()),
-		("meancentering", SpectraMeanCenter()),
-		("smmothing", SavgolFilter(deriv=0)),
-	])
-
-
-
-	X_train = pipeline.fit_transform(X_train)
-	X_m = pipe_mean.fit_transform(X)
-
-	meaner = MeanCenter()
-	meaner.fit(X)
-	meaner.transform(X)
-	meaner.fit_transform(X)
-	#
-	#     from sklearn.pipeline import Pipeline
-	#
-	#     def create_pipe(pipeline):
-	#         pipeline = Pipeline([
-	#             ("scaleing_X", GlobalStandardScaler()),
-	#             ("scatter_correction", EmscScaler()),
-	#             ("smmothing", SavgolFilter())
-	#             ])
-	#         return pipeline
-	#
-	#     def create_aug_pipe(aug_pipeline):
-	#         aug_pipeline = Pipeline([
-	#             ("scaleing_X", GlobalStandardScaler()),
-	#             ("dataaugmentation", Dataaugument())
-	#             ("scatter_correction", EmscScaler()),
-	#             ])
-	#         return pipeline
-	#
-	#
-	#
-	#     specs = pd.read_csv('./luzrawSpectra/nirMatrix.csv')
-	#     lab = pd.read_excel('./luzrawSpectra/labdata.xlsx')
-	#
-	#     from import_luz import importLuz
-	#     X, y_Xp, y_Xl, wl = importLuz(specs, lab)
-	#
-	#
-	#     aug_pipline = Pipeline([
-	#         ("scaleing_X", GlobalStandardScaler()),
-	#         ("dataaug", Dataaugument()),
-	#         ("scatter_correction", EmscScaler())
-	#         ])
-	#
-	#
-	#     X_pipe = aug_pipline.fit_transform(X)

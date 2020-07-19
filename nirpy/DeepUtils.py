@@ -3,11 +3,15 @@ import tensorflow.keras as keras
 import tensorflow as tf
 
 class MCDropout(keras.layers.Dropout):
+    """Modeling uncertainty with Monte Carlo dropout by
+    running multiple forward passes trough the model with a different dropout
+     masks every time"""
     def call(self, inputs):
         return super().call(inputs, training=True)
 
 
 class HuberLoss(keras.losses.Loss):
+    """huber loss, a robust loss estimator during neuralnet training"""
     def __init__(self, threshold=2.0, **kwargs):
         self.threshold = threshold
         super().__init__(**kwargs)
@@ -22,9 +26,18 @@ class HuberLoss(keras.losses.Loss):
         return {**base_config, "threshold": self.threshold}
 
 
-'''add create huber function????'''
+def create_huber(threshold=1.0):
+    """creates a huber loss function with specified threshold"""
+    def huber_fn(y_true, y_pred):
+        error = y_true - y_pred
+        is_small_error = tf.abs(error) < threshold
+        squared_loss = tf.square(error) / 2
+        linear_loss = threshold * tf.abs(error) - threshold**2 / 2
+        return tf.where(is_small_error, squared_loss, linear_loss)
+    return huber_fn
 
 class HuberMetric(keras.metrics.Metric):
+    """shows huber loss for each epoch during training"""
     def __init__(self, threshold=1.0, **kwargs):
         super().__init__(**kwargs) # handles base args (e.g., dtype) self.threshold = threshold
         self.huber_fn = create_huber(threshold)
@@ -45,7 +58,7 @@ class HuberMetric(keras.metrics.Metric):
 
 
 class CustomStopper(keras.callbacks.EarlyStopping):
-    '''preventing too early stopping by setting start.epoch'''
+    """preventing too early stopping by setting start.epoch"""
     def __init__(self, monitor='val_loss',
              min_delta=0, patience=0, verbose=0, mode='auto', start_epoch = 100): # add argument for starting epoch
         super(CustomStopper, self).__init__()
