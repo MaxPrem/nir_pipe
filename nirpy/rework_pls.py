@@ -92,9 +92,6 @@ X_test_sel = pipeline.transform(X_test)
 #######
 
 
-sel_model = pls_opt_cv(X_train_sel, y_train, 4)
-
-
 pls_crossval(X_train, y_train, 10)
 
 from ValidationUtils import cal_scores, benchmark_table

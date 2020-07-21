@@ -3,47 +3,19 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-# ?????
-#
-# def cut_Spectra(X_df, start=0, stop=None):
-#     X_df = pd.DataFrame(X_df)
-#
-#     if stop is None:
-#         stop=len(X_df.columns)
-#
-#     X = X_df.iloc[:].iloc[:,start:stop]
-#     wl =  X.columns.values
-#
-#     fig = plt.figure(figsize=(8,6))
-#     with plt.style.context(('ggplot')):
-#         plt.plot(-wl, X.T)
-#         plt.xlabel('Wavenumber (cm-1)')
-#         plt.ylabel('Absorbance spectra')
-#         plt.show()
-#         print("Spectra rangeing from", wl.max(), 'to', wl.min(), 'cm-1')
-#
-#     return X.values, wl
 
-
-def cut_Spectra(X_df, start=0, stop=None):
-
-    X_df = pd.DataFrame(X_df)
-    if stop is None:
-        stop = len(X_df.columns)
-
-    X = X_df.iloc[:].iloc[:, start:stop]
-    wl = X.columns.values
-
-    fig = plt.figure(figsize=(8, 6))
+def plot_spec(wave_number, X):
+    """plots spectra by setting the wavenumber to the x-achsis and samples absorption values to y-achsis"""
+    fig, ax = plt.subplots()
     with plt.style.context(("ggplot")):
-        plt.plot(-wl, X.T)
-        plt.xlabel("Wavenumber (cm-1)")
-        plt.ylabel("Absorbance spectra")
+        plt.plot(wave_number, X.T)
+        ax.set_xlim(wave_number.max(), wave_number.min())  # decreasing time
+        ax.set_xlabel("Wavenumber (cm-1)")
+        ax.set_ylabel("Absorbance spectra")
+        ax.grid(True)
+
         plt.show()
-        print("Spectra rangeing from", wl.max(), "to", wl.min(), "cm-1")
-
-    return X.values, wl
-
+        print("Spectra rangeing from", wave_number.max(), "to", wave_number.min(), "cm-1")
 
 def cut_specs(specs, start, stop, plot=True):
     """Cuts spectra by columnname"""
@@ -55,40 +27,10 @@ def cut_specs(specs, start, stop, plot=True):
 
     X = specs.loc[:, str(start) : str(stop)]
 
-    wl = X.columns.astype(int)
+    wave_number = X.columns.astype(int)
 
     if plot == True:
-        fig = plt.figure(figsize=(8, 6))
-        with plt.style.context(("ggplot")):
-            plt.plot(wl, X.T)
-            plt.xlabel("Wavenumber (cm-1)")
-            plt.ylabel("Absorbance spectra")
-            plt.show()
-            print("Spectra rangeing from", wl.max(), "to", wl.min(), "cm-1")
-
-    return specs.loc[:, str(start) : str(stop)]
-
-
-def cut_specs2(specs, start, stop, plot=True):
-    """Cuts spectra by columnname"""
-
-    specs = specs.set_index[0].sort_index()
-
-    if start < stop:
-        stop, start = start, stop
-
-    X = specs.loc[:, str(start) : str(stop)]
-
-    wl = X.columns.astype(int)
-
-    if plot == True:
-        fig = plt.figure(figsize=(8, 6))
-        with plt.style.context(("ggplot")):
-            plt.plot(wl, X.T)
-            plt.xlabel("Wavenumber (cm-1)")
-            plt.ylabel("Absorbance spectra")
-            plt.show()
-            print("Spectra rangeing from", wl.max(), "to", wl.min(), "cm-1")
+        plot_spec(wave_number,X)
 
     return specs.loc[:, str(start) : str(stop)]
 
@@ -114,9 +56,9 @@ def importLuzCol(specs, lab, lab_col=4):
         specs = specs.set_index("Unnamed: 0").sort_index()
     else:
         print("Reload specs from file.")
-    wl = specs.columns.astype(int)
+    wave_number = specs.columns.astype(int)
     lab = lab.set_index(["Code"]).sort_index()
-    # wl.shape
+    # wave_number.shape
     # lab.shape
     # specs
 
@@ -158,7 +100,7 @@ def importLuzCol(specs, lab, lab_col=4):
 
     ref = lab_values[lab_col]
 
-    return X, y, wl, ref
+    return X, y, wave_number, ref
 
 
 def sel_wavs(specs, lab, sel_feats, lab_col=4):
@@ -169,9 +111,9 @@ def sel_wavs(specs, lab, sel_feats, lab_col=4):
 
     specs = specs.set_index("Unnamed: 0").sort_index()
     specs = specs[sel_feats]
-    wl = specs.columns.astype(int)
+    wave_number = specs.columns.astype(int)
     lab = lab.set_index(["Code"]).sort_index()
-    # wl.shape
+    # wave_number.shape
     # lab.shape
     # specs
 
@@ -210,7 +152,7 @@ def sel_wavs(specs, lab, sel_feats, lab_col=4):
     print("Features for Regressoin:", lab_values)
     print("Features for Classification:", lab_class)
     print("Setting y to", lab_values[lab_col])
-    return X, y, wl
+    return X, y, wave_number
 
 
 if __name__ == "__main__":
@@ -235,10 +177,10 @@ if __name__ == "__main__":
     specs.index
     cut_specs.index
 
-    X, y, wl = importLuzCol(cut_specs, lab, 4)
+    X, y, wave_number = importLuzCol(cut_specs, lab, 4)
     X
 
-    _ = plt.plot(-wl, X.T,)
+    _ = plt.plot(-wave_number, X.T,)
 
     specs.set_index(list(specs.columns[0]))
 
@@ -248,7 +190,7 @@ if __name__ == "__main__":
 #
 #
 #
-# X, y , wl, regressors, classes = importLuzCol(specs, lab, lab_col=4)
+# X, y , wave_number, regressors, classes = importLuzCol(specs, lab, lab_col=4)
 # X.shape
 # y.shape
 #

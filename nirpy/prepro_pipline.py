@@ -2,11 +2,12 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
+
 from ChemUtils import EmscScaler, GlobalStandardScaler, SavgolFilter
-from enet_var import Enet_Select
+from CrossValPLS import optimal_n_comp, pls_regression, pls_scores
+from ElasticNetVariableSelection import EnetSelect, MultiTaskElasticNet
 from ImportModule import cut_specs, importLuzCol
-from pls_utils import Outlier, PLSOptimizer, pls_cv, pls_opt_cv
-from validation_utils import da_func_ncv
+from ValidationUtils import print_regression_benchmark, print_cv_table, cv_benchmark_model, val_regression_plot
 
 # %%
 # impor data
@@ -15,18 +16,24 @@ from validation_utils import da_func_ncv
 specs = pd.read_csv("/Users/maxprem/nirPy/calData_full.csv")  # full spectra
 lab = pd.read_excel("/Users/maxprem/nirGit/nirpy/luzrawSpectra/labData.xlsx")
 # input wavenumber to cut spectra
-specs = cut_specs(specs, 4100, 5500)
+specs = cut_specs(specs, 4100, 6500)
 # specs = cut_specs(specs, 4100, 5500)
 
 # %%
 # assing spectra and refernce method
 
 
-X, y, wl, ref = importLuzCol(specs, lab, 4)
+X, y, wl, ref = importLuzCol(specs, lab, 3)
 
 # split dataset in train and test data
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42)
+    X, y, test_size=0.4, random_state=42)
+
+# %%
+# storeing data in a dictonary to pass  as function parameter with **data
+data = {"X": X_train, "y": y_train, "X_test": X_test, "y_test": y_test}
+
+
 
 # %%
 #transformation pipeline
@@ -42,26 +49,73 @@ pipeline = Pipeline(
         ("scaleing_X", GlobalStandardScaler()),
         ("scatter_correction", EmscScaler()),
         ("smmothing", SavgolFilter(polyorder=2, deriv=0)),
-        #("variable_selection", Enet_Select()),
+        #("variable_selection", EnetSelect()),
     ]
 )
 # to perform variable selection y values are corrleated in the fit method
-X_train = pipeline.fit_transform(X_train, y_train)
+X_train_en = pipeline.fit_transform(X_train, y_train)
+X_test_en = pipeline.transform(X_test)
 
-# t
-X_test = pipeline.transform(X_test)
-# pipeline['variable_selection'].plot(wl, x_pip)
+data_en = {"X": X_train_en, "y": y_train, "X_test": X_test_en, "y_test": y_test}
+# %%
+#transformation pipeline
+
+
+variable_selection_pip = Pipeline(
+    [
+        ("scaleing_X", GlobalStandardScaler()),
+        ("scatter_correction", EmscScaler()),
+        ("smmothing", SavgolFilter(polyorder=2, deriv=0)),
+        #("variable_selection", EnetSelect()),
+    ]
+)
+# to perform variable selection y values are corrleated in the fit method
+X_train_pip = variable_selection_pip.fit_transform(X_train, y_train)
+X_test_pip = variable_selection_pip.transform(X_test)
+
+data_pip = {"X": X_train_pip, "y": y_train, "X_test": X_test_pip, "y_test": y_test}
+# %%
+# pipeline['variable_selection'].plot(wl, X)
 
 # %% codecell
 
-model = pls_opt_cv(X_train, y_train, 9)
-from validation_utils import cross_table
-cross_table(X_train, y_train, X_test, y_test, model)
+opt_comp = optimal_n_comp(**data_pip, n_comp=20, plot=True)
 
-da_func_ncv(X_train, y_train, X_test, y_test, y, ref, model)
+def pls_crossval(X, y, n_comp = 10, plot=False, **kargs):
+    """returns a model with the optimsed number of pls components"""
+
+    # returns n_comp with lowest loss
+    opt_comp = optimal_n_comp(X, y, n_comp, plot=plot)
+    # performs regression with n_comp
+    opt_model = pls_regression(X,y, opt_comp, plot=plot)
+    # returns regression scores
+    pls_scores(X,y, opt_model)
+
+    return opt_model
+
+# %%
+model_en = pls_crossval(**data_en, n_comp = 10)
+
+
+model_pip = pls_crossval(**data_pip, n_comp =10)
+# %%
 
 
 
+cv_benchmark_model(**data_en, y_unscaled=y, ref=ref,  model = model_en)
+# %%
+cv_benchmark_model(**data_pip, y_unscaled=y, ref=ref, model = model_pip)
+
+# %%
+
+
+
+ print_cv_table(**data_pip, model = model_pip)
+
+# %%
+print_cv_table(**data_en, model = model_en)
+
+# benchmark_table(X_train, y_train, X_test, y_test, model)
 
 
 # %% markdown

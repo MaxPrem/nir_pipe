@@ -34,9 +34,10 @@ from tensorflow.keras.models import Sequential, load_model, save_model
 from nirpy.ChemUtils import (Dataaugument, EmscScaler, GlobalStandardScaler,
                              benchmark, huber, scaled_benchmark)
 from nirpy.DeepUtils import CustomStopper, HuberLoss, MCDropout
-from nirpy.import_Module import cut_specs, importLuzCol
-from nirpy.validation_utils import da_func, tensor_benchmark
+from nirpy.ImportModule import  import cut_specs, importLuzCol
+from nirpy.ValidationUtils import tensor_benchmark
 import tensorflow as tf
+
 assert tf.__version__ >= "2.0"
 print(tf.__version__)
 
