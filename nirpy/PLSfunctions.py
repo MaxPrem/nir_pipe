@@ -10,17 +10,16 @@ from sklearn.cross_decomposition import PLSRegression
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import cross_val_predict
 
-#from scipy.signal import savgol_filter
-
+# from scipy.signal import savgol_filter
 
 
 class Outlier(PLSRegression):
     """Removes Outlier by performing PLS regression on spectra and the lab reference method. and compareing Q-Residuals and """
 
-    def __init__(self, conf=0.95, n_comps=5):
+    def __init__(self, conf=0.95):
 
         self.conf = conf
-        self.n_comps = n_comps
+        self.n_comp = None
 
         # self.fit = None
         self.X = None
@@ -40,10 +39,11 @@ class Outlier(PLSRegression):
         self.X_in = None
         self.y_in = None
 
-    def fit(self, X, y):
+    def fit(self, X, y, n_comp=5):
         self.X = X
+        self.n_comp = n_comp
 
-        pls = PLSRegression(n_components=self.n_comps)
+        pls = PLSRegression(n_components=self.n_comp)
         # Fit data
         pls.fit(self.X, y)
 
@@ -63,10 +63,10 @@ class Outlier(PLSRegression):
         # conf = self.conf
         # Calculate confidence level for T-squared from the ppf of the F distribution
         self.Tsq_conf = (
-            f.ppf(q=self.conf, dfn=self.n_comps, dfd=self.X.shape[0])
-            * self.n_comps
+            f.ppf(q=self.conf, dfn=self.n_comp, dfd=self.X.shape[0])
+            * self.n_comp
             * (self.X.shape[0] - 1)
-            / (self.X.shape[0] - self.n_comps)
+            / (self.X.shape[0] - self.n_comp)
         )
         # Estimate the confidence level for the Q-residuals
         i = np.max(self.Q) + 1
@@ -119,9 +119,9 @@ class Outlier(PLSRegression):
             mse = np.zeros(max_outliers)
 
             for j in range(max_outliers):
-                pls = PLSRegression(n_components=self.n_comps)
+                pls = PLSRegression(n_components=self.n_comp)
                 pls.fit(Xc[j:, :], Yc[j:])
-                y_cv = cross_val_predict(pls, Xc[j:, :], Yc[j:], cv=16)
+                y_cv = cross_val_predict(pls, Xc[j:, :], Yc[j:], cv=10)
 
                 mse[j] = mean_squared_error(Yc[j:], y_cv)
                 msemin = np.where(mse == np.min(mse[np.nonzero(mse)]))[0][0]
@@ -150,44 +150,42 @@ class PLSOptimizer(object):
 
         self.n_comp = None
         self.X = None
-        self.y = None
-        self.wl = None
 
         self.opt_Xc = None
         self.opt_ncomp = None
-        self.wav = None
+
+        # seleted wavenumber
+        # number removed
+        self.n_rem = None
+        # sorted wavenumber
         self.sorted_ind = None
 
-    def fit(self, X, y, max_comp=2):
+    def fit(self, X, y, max_comp=2, **kwargs):
 
-        # self.wl = wl
-        self.X = X
-        self.y = y
-        self.wl = np.arange(0, X.shape[1])
+        # self.wave_number = wave_number
 
         # max_comp = self.n_comp
-
-        mse = np.zeros((max_comp, self.X.shape[1]))
+        mse = np.zeros((max_comp, X.shape[1]))
         # Loop over the nimber of PLS componets
         for i in range(max_comp):
             # Regression with specified number of components,
             # using full spectrum
             pls1 = PLSRegression(n_components=i + 1)
-            pls1.fit(self.X, self.y)
+            pls1.fit(X, y)
             # Indices of sort spectra accroding to ascending absolute
             # value of PLS coefficients
             #  these are the regression coefficients that quantify the strength of the association between each wavelength and the response
             sorted_ind = np.argsort(np.abs(pls1.coef_[:, 0]))
             # Sort spectra accordingly
-            Xc = self.X[:, sorted_ind]
+            Xc = X[:, sorted_ind]
             # Discard one wavelength at a time of the sorted spectra,
             # regress, and calculate the MSE cross-vaidation
             for j in range(Xc.shape[1] - (i + 1)):
                 pls2 = PLSRegression(n_components=i + 1)
-                pls2.fit(Xc[:, j:], self.y)
+                pls2.fit(Xc[:, j:], y)
 
-                y_cv = cross_val_predict(pls2, Xc[:, j:], self.y, cv=5)
-                mse[i, j] = mean_squared_error(self.y, y_cv)
+                y_cv = cross_val_predict(pls2, Xc[:, j:], y, cv=5)
+                mse[i, j] = mean_squared_error(y, y_cv)
 
             comp = 100 * (i + 1) / (max_comp)
             stdout.write("\r%d%% completed" % comp)
@@ -197,6 +195,8 @@ class PLSOptimizer(object):
 
         # Calculate and print the position of minimum in MSE
         mseminx, mseminy = np.where(mse == np.min(mse[np.nonzero(mse)]))
+
+        # return mseminx, mseminy
 
         # print(f'mseminx: {0}, mseminy: {1}'.format(mseminx, mseminy))
 
@@ -208,51 +208,67 @@ class PLSOptimizer(object):
         # plt.show()
         # Calculate PLS with optimal components and export values
         pls = PLSRegression(n_components=mseminx[0] + 1)
-        pls.fit(self.X, self.y)
+        pls.fit(X, y)
 
         sorted_ind = np.argsort(np.abs(pls.coef_[:, 0]))
 
-        Xc = self.X[:, sorted_ind]
+        Xc = X[:, sorted_ind]
 
         opt_Xc = Xc[:, mseminy[0] :]
 
         self.opt_Xc = opt_Xc
         self.opt_ncomp = mseminx[0] + 1
-        self.wav = mseminy[0]
+        self.n_rem = mseminy[0]
         self.sorted_ind = sorted_ind
 
-        # return(Xc[:,mseminy[0]:],mseminx[0]+1,mseminy[0], sorted_ind)
+        return self
 
-    def transform(self, X, y=None):
+    def transform(self, X, **kwargs):
         """transfrom test data"""
         # sort
         Xc = X[:, self.sorted_ind]
-        opt_Xc = Xc[:, self.wav :]
+        opt_Xc = Xc[:, self.n_rem :]
         # remove
 
-        return opt_Xc, y
+        return opt_Xc
 
-    def plot(self):
-        #
-        # if wl == None:
-        #     wl = np.arange(0,X.shape[1])
-        # self.wl = wl
-        # import matplotlib.collections as collections
+    def plot_feature_importance(self, wave_number, n_features=50):
+        """bar plot with sorted wavenumbers up to highest correlation with response variable"""
 
-        # Plot spectra with superimpose selected bands
-        ix = np.in1d(self.wl.ravel(), self.wl[self.sorted_ind][: self.wav])
+        feature_importance, n_selected_features = self.sorted_ind, self.n_rem
+
+        print(
+            "{0:d} features selected, reduction of {1:2.2f}%".format(
+                n_selected_features,
+                (1 - n_selected_features / len(feature_importance)) * 100,
+            )
+        )
+        # ind_arr = np.array( dtype=int)
+
+        feature_df = pd.Series(data=feature_importance.values, index=wave_number)
+        feature_df.sort_values().tail(30).plot(kind="bar")
+
+    def plot(self, wave_number, X):
+        """shows selected variables as white bands on a given spectra"""
+        # position selected variables
+        wave_number_selected = np.in1d(
+            wave_number.ravel(), wave_number[self.sorted_ind][: self.n_rem]
+        )
+
         with plt.style.context("ggplot"):
-            fig, ax = plt.subplots(figsize=(8, 9))
+            fig, ax = plt.subplots(figsize=(8, 6))
             with plt.style.context(("ggplot")):
-                ax.plot(self.wl, self.X.T)
-                plt.ylabel("First derivative absorbance spectra")
-                plt.xlabel("Wavelength (nm)")
+                plt.plot(wave_number, X.T)
+                ax.set_xlim(wave_number.max(), wave_number.min())  # decreasing
+                ax.set_xlabel("Wavenumber (cm-1)")
+                ax.set_ylabel("Absorbance spectra")
+                ax.grid(True)
 
                 collection = collections.BrokenBarHCollection.span_where(
-                    self.wl,
-                    ymin=-1,
-                    ymax=1,
-                    where=ix == True,
+                    wave_number,
+                    ymin=X.min(),
+                    ymax=X.max(),
+                    where=wave_number_selected == True,
                     facecolor="red",
                     alpha=0.3,
                 )
@@ -262,7 +278,7 @@ class PLSOptimizer(object):
 
     def get_params(self):
 
-        return self.opt_Xc, self.opt_ncomp, self.wav, self.sorted_ind
+        return self.opt_Xc, self.opt_ncomp, self.n_rem, self.sorted_ind
 
     def predict(self, X_test=None, y_test=None, n_comp=None):
         if n_comp == None:
@@ -303,6 +319,7 @@ class PLSOptimizer(object):
             plt.show()
 
             return model
+
 
 def pls_cv(X, y, n_comp=2):
 
@@ -416,20 +433,20 @@ def pls_opt_cv(X, y, n_comp=10, plot_components=True):
     # Fit a line to the CV vs Response
 
     z = np.polyfit(y, y_predicted, 1)
-    with plt.style.context(('ggplot')):
-    	 fig, ax = plt.subplots(figsize=(9, 5))
-    	 ax.scatter(y_predicted, y, c='red', edgecolors='k')
-    	 #ax.scatter(y_pred_cv, y, c='blue', edgecolors='k')
-    	 #Plot the best fit line
-    	 ax.plot(np.polyval(z,y), y, c='blue', linewidth=1)
-    	 #Plot the ideal 1:1 linear
-    	 ax.plot(y,y, color='green', linewidth=1)
+    with plt.style.context(("ggplot")):
+        fig, ax = plt.subplots(figsize=(9, 5))
+        ax.scatter(y_predicted, y, c="red", edgecolors="k")
+        # ax.scatter(y_pred_cv, y, c='blue', edgecolors='k')
+        # Plot the best fit line
+        ax.plot(np.polyval(z, y), y, c="blue", linewidth=1)
+        # Plot the ideal 1:1 linear
+        ax.plot(y, y, color="green", linewidth=1)
 
-    	 plt.title('$R^{2}$ (CV): '+str(score_cv.mean().round(3)))
-    	 plt.xlabel('Predicted')
-    	 plt.ylabel('Measured')
+        plt.title("$R^{2}$ (CV): " + str(score_cv.mean().round(3)))
+        plt.xlabel("Predicted")
+        plt.ylabel("Measured")
 
-    	 plt.show()
+        plt.show()
 
     return model
 

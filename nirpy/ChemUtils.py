@@ -16,6 +16,7 @@ def huber(y_true, y_pred, delta=1.0):
 	return np.mean(delta**2*( (1+((y_true-y_pred)/delta)**2)**0.5 -1))
 
 def spec_mean_centering(X):
+
 	X_df = pd.DataFrame(X)
 	return X_df.subtract(X_df.mean()).values
 
@@ -217,4 +218,3 @@ class Dataaugument(object):
 	def fit_transform(self, X, y= None):
 		X = self.fit(X)
 		return self.augment(X)
-

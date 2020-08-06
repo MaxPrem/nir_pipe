@@ -3,7 +3,7 @@
 
 
 # Set directory for model callbacks to be saved
-# %% 
+# %%
 import os
 import time
 
@@ -20,22 +20,17 @@ import tensorflow.keras as keras
 import tensorflow.keras.losses
 from keras.wrappers.scikit_learn import KerasRegressor
 
-from sklearn.model_selection import (cross_val_predict, cross_val_score,
-                                     train_test_split)
+from sklearn.model_selection import (cross_val_predict, cross_val_score, train_test_split)
 from sklearn.pipeline import Pipeline
 from tensorflow.keras import backend as K
 from tensorflow.keras.callbacks import (EarlyStopping, ModelCheckpoint,
-                                        ReduceLROnPlateau)
+										ReduceLROnPlateau)
 from tensorflow.keras.layers import (Conv1D, Dense, Dropout, Flatten,
-                                     GaussianNoise, Reshape, SeparableConv1D)
+									 GaussianNoise, Reshape, SeparableConv1D)
 from tensorflow.keras.models import Sequential, load_model, save_model
-
-# %% codecell
-from nirpy.ChemUtils import (Dataaugument, EmscScaler, GlobalStandardScaler,
-                             benchmark, huber, scaled_benchmark)
+from nirpy.ChemUtils import (Dataaugument, EmscScaler, GlobalStandardScaler)
 from nirpy.DeepUtils import CustomStopper, HuberLoss, MCDropout
-from nirpy.ImportModule import  import cut_specs, importLuzCol
-from nirpy.ValidationUtils import tensor_benchmark
+from nirpy.ImportModule import cut_specs, importLuzCol
 import tensorflow as tf
 
 assert tf.__version__ >= "2.0"
@@ -51,12 +46,12 @@ lab = pd.read_excel('./nirpy/luzrawSpectra/labdata.xlsx')
 
 specs = cut_specs(specs, 4100, 8000)
 
-X, y, wl, ref = importLuzCol(specs, lab, 4)
+X, y, wl, ref = importLuzCol(specs, lab, 1)
 
+# %%
 
-
-X, X_val, y, y_val = train_test_split(X, y, test_size=0.05, random_state=42)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+X, X_val, y, y_val = train_test_split(X, y, test_size=0.10, random_state=42)
+X, X_test, y, y_test = train_test_split(X, y, test_size=0.35, random_state=42)
 
 
 
@@ -65,15 +60,16 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random
 # scale y
 #from sklearn.preprocessing import RobustScaler
 yscaler = GlobalStandardScaler()
-y_train = yscaler.fit_transform(y_train)
+y = yscaler.fit_transform(y)
 y_test = yscaler.transform(y_test)
 y_val = yscaler.transform(y_val)
 
+y_test.shape
+y_val.shape
 
-
+y_aug = np.repeat(y, repeats=100, axis=0) #y is simply repeated
 
 # y augmentation
-y_aug = np.repeat(y_train, repeats=100, axis=0) #y_train is simply repeated
 
 # try to repat y with dataaug.fit()
 
@@ -84,158 +80,76 @@ aug_pipline = Pipeline([
 	("scatter_correction", EmscScaler())
 	])
 # Data augmentation is only applied when using fit_transfrom (on X_aug for training the model on more data)
-# when plotting we prefere normaly fitted X_train without augmentation
-X_aug = aug_pipline.fit_transform(X_train)
+# when plotting we prefere normaly fitted X without augmentation
+X_aug = aug_pipline.fit_transform(X)
 
 X_val = aug_pipline.transform(X_val)
-X_train = aug_pipline.transform(X_train)
+X = aug_pipline.transform(X)
 X_test = aug_pipline.transform(X_test)
 
 X_aug.shape
-X_train.shape
-y_train.shape
+X.shape
+y.shape
 
 
 
-# %% codecell
-
-#Hyperparameters for the network
-DENSE = 128
-DROPOUT = 0.5
-C1_K  = 8   #Number of kernels/feature extractors for first layer
-C1_S  = 32  #Width of the convolutional mini networks
-C2_K  = 16
-C2_S  = 32
-
-#input
-input_dim = X_aug.shape[1]
-
-'''leakyrelu'''
-
-leaky_relu = keras.layers.LeakyReLU(alpha=0.2)
-activation=leaky_relu
-#activation='relu'
-kernel_initializer = "he_normal"
-
-'''selu'''
-#For SELU activation, just set activation="selu" and kernel_initial izer="lecun_normal" when creating a layer:
-
-activation = 'selu'
-kernel_initializer = 'lecun_normal'
-
-#example: layer = keras.layers.Dense(10, activation="selu", kernel_initializer="lecun_normal")
+data = {"X": X, "y": y, "X_test": X_test, "y_test": y_test, "X_val": X_val, "y_val": y_val}
 
 
 
 
-model = keras.models.Sequential([
-	GaussianNoise(0.05, input_shape=(input_dim,)),
-	Reshape((input_dim, 1)),
-	SeparableConv1D(C1_K, (C1_S), padding="same", kernel_initializer= kernel_initializer, use_bias=False, kernel_constraint=keras.constraints.max_norm(1.)),
-	keras.layers.Activation(activation),
-	SeparableConv1D(C2_K, (C2_S), padding="same", kernel_initializer= kernel_initializer, use_bias=False, kernel_constraint=keras.constraints.max_norm(1.)),
-	keras.layers.Activation(activation),
-	Flatten(),
-	MCDropout(DROPOUT),
-	Dense(DENSE, kernel_constraint=keras.constraints.max_norm(1.)),
-	keras.layers.Activation(activation),
-	MCDropout(DROPOUT),
-	Dense(1, activation='linear', kernel_constraint=keras.constraints.max_norm(1.) ,use_bias=False)
-])
-
-
-########################################################################################################################
-###########################################     cross_validate   #######################################################
-########################################################################################################################
-
-
+# %%
 ###################################################
 ######## model initialization as funciton #########
 ###################################################
-
-
 def create_model():
 
-    DENSE = 128
-    DROPOUT = 0.5
-    C1_K  = 8   #Number of kernels/feature extractors for first layer
-    C1_S  = 32  #Width of the convolutional mini networks
-    C2_K  = 16
-    C2_S  = 32
+	# optimsed network shape of la
+	DENSE = 128
+	DROPOUT = 0.5
+	C1_K  = 8   #Number of kernels/feature extractors for first layer
+	C1_S  = 32  #Width of the convolutional mini networks
+	C2_K  = 16
+	C2_S  = 32
 
-    #input
-    input_dim = X_aug.shape[1]
+	#input
+	input_dim = X_aug.shape[1]
 
-    '''leakyrelu'''
-
-    leaky_relu = keras.layers.LeakyReLU(alpha=0.2)
-    activation=leaky_relu
-    #activation='relu'
-    kernel_initializer = "he_normal"
-
-    '''selu'''
-    #For SELU activation, just set activation="selu" and kernel_initial izer="lecun_normal" when creating a layer:
-
-    activation = 'selu'
-    kernel_initializer = 'lecun_normal'
-
-    model = keras.models.Sequential()
-
-    model.add(GaussianNoise(0.05, input_shape=(input_dim,)))
-    model.add(Reshape((input_dim, 1)))
-    model.add(SeparableConv1D(C1_K, (C1_S), padding="same", kernel_initializer= kernel_initializer, use_bias=False, kernel_constraint=keras.constraints.max_norm(1.)))
-    model.add(keras.layers.Activation(activation))
-    model.add(SeparableConv1D(C2_K, (C2_S), padding="same", kernel_initializer= kernel_initializer, use_bias=False, kernel_constraint=keras.constraints.max_norm(1.)))
-    model.add(keras.layers.Activation(activation))
-    model.add(Flatten())
-    model.add(MCDropout(DROPOUT))
-    model.add(Dense(DENSE, kernel_constraint=keras.constraints.max_norm(1.)))
-    model.add(keras.layers.Activation(activation))
-    model.add(MCDropout(DROPOUT))
-    model.add(Dense(1, activation='linear', kernel_constraint=keras.constraints.max_norm(1.) ,use_bias=False))
-
-    ###########
-
-    #model.compile(loss=HuberLoss(), optimizer = keras.optimizers.Nadam(lr=0.001, beta_1=0.9, beta_2=0.999))
-    return model
+    # activatoin function
+	leaky_relu = keras.layers.LeakyReLU(alpha=0.2)
+	activation=leaky_relu
+	kernel_initializer = "he_normal"
 
 
+	model = keras.models.Sequential()
+
+	model.add(GaussianNoise(0.05, input_shape=(input_dim,)))
+	model.add(Reshape((input_dim, 1)))
+	model.add(SeparableConv1D(C1_K, (C1_S),activation=activation, padding="same", kernel_initializer= kernel_initializer, use_bias=False, kernel_constraint=keras.constraints.max_norm(1.)))
+	keras.layers.MaxPooling1D(pool_size=2),
+	model.add(SeparableConv1D(C2_K, (C2_S), activation=activation, padding="same", kernel_initializer= kernel_initializer, use_bias=False, kernel_constraint=keras.constraints.max_norm(1.)))
+	keras.layers.MaxPooling1D(pool_size=2),
+	model.add(Flatten())
+	model.add(MCDropout(DROPOUT))
+	model.add(Dense(DENSE,activation=activation, kernel_constraint=keras.constraints.max_norm(1.)))
+	model.add(MCDropout(DROPOUT))
+	model.add(Dense(1, activation='linear', kernel_constraint=keras.constraints.max_norm(1.) ,use_bias=False))
+
+	###########
+	# sometimes model needs to be compiled outside of function
+	model.compile(loss=HuberLoss(), optimizer = keras.optimizers.Nadam(lr=0.001, beta_1=0.9, beta_2=0.999))
+	return model
+
+model = create_model()
 #compile model
 model.compile(loss=HuberLoss(), optimizer = keras.optimizers.Nadam(lr=0.001, beta_1=0.9, beta_2=0.999))
 
-
-#####################################################
-############cv-predict/score TF######################
-#####################################################
-
-#huber_score = metrics.make_scorer(huber)
-# # evaluate model with standardized dataset
-# estimator = KerasRegressor(build_fn=create_model, epochs=45, batch_size=16, verbose=0)
-# kfold = KFold(n_splits=5, shuffle=True)
-#
-# results = cross_val_score(estimator, X_aug, y_aug, cv=kfold, scoring=huber_score )
-# results
-# print("HuberScore: %.2f%% (%.2f%%)" % (results.mean()*100, results.std()*100))
+model.summary()
 
 
-###############
-#compile model#
-###############
-
-# model.compile(loss=HuberLoss(), optimizer = keras.optimizers.Nadam(lr=0.001, beta_1=0.9, beta_2=0.999))
-
-############
-#set run id#
-############
-
-checkpoint_name = "Xl"
-run_id_tensor_board = "run_%Y_%m_%d-%H_%M_%S_prot_XL"
-
-
-############
-#**********#
-############
-
+# %%
+checkpoint_name = "test_XA"
+run_id_tensor_board = "run_%Y_%m_%d-%H_%M_%S_test_XA"
 
 # tensorboard
 def get_run_logdir():
@@ -252,54 +166,84 @@ tensorboard_cb = keras.callbacks.TensorBoard(run_logdir)
 
 for entry_point in pkg_resources.iter_entry_points('tensorboard_plugins'):
 	print(entry_point.dist)
-X_aug.shape
+
+# %% cv predict
+
+# from sklearn import metrics
+# from ScoreUtils import huber_loss
+# huber_score = metrics.make_scorer(huber_loss)
+# # evaluate model with standardized dataset
+# estimator = KerasRegressor(build_fn=create_model, epochs=45, batch_size=16, verbose=0)
+# kfold = KFold(n_splits=5, shuffle=True)
+#
+# #results = cross_val_score(estimator, X_aug, y_aug, cv=kfold, scoring=huber_score )
+# y_cv = cross_val_predict(estimator, X, y, cv=10)
+
+#print("HuberScore: %.2f%% (%.2f%%)" % (results.mean()*100, results.std()*100))
 
 
-model.summary()
-######################
-# defineing Callbacks#
-######################
+
+# %%
+# define callbacks
 
 rdlr = ReduceLROnPlateau(patience=5, factor=0.5, min_lr=1e-6, monitor='val_loss', verbose=1)
 checkpoint_cb = ModelCheckpoint(checkpoint_name, save_best_only=True, monitor='val_loss')
-custom_stopper = CustomStopper(start_epoch = 40, monitor='val_loss', verbose=1, patience=16)
+custom_stopper = CustomStopper(start_epoch = 60, monitor='val_loss', verbose=1, patience=16)
 
 #early_stopping_cb = EarlyStopping(patience=20, restore_best_weights=True, monitor='val_loss')
 
+# %% mark
+# TRAIN MODEL
 
+history = model.fit(X_aug, y_aug, epochs = 80, batch_size=16, validation_data=(X_test, y_test) , callbacks=[rdlr, custom_stopper, tensorboard_cb, checkpoint_cb])
 
-##############
-# TRAIN MODEL#
-##############
-
-history = model.fit(X_aug, y_aug, epochs = 70, batch_size=16, validation_data=(X_test, y_test) , callbacks=[rdlr, custom_stopper, tensorboard_cb, checkpoint_cb])
-#
-# with keras.backend.learning_phase_scope(1): # force training mode = dropout on
-#     y_probas = np.stack([model.predict(X_test)
-#     for sample in range(100)]):
-# y_proba = y_probas.mean(axis=0)
-
-
-# Load the TensorBoard notebook extension
-# %load_ext tensorboard
-# %tensorboard -logdir=./my_logs
-#
-#
-# import pkg_resources
-#
-# for entry_point in pkg_resources.iter_entry_points('tensorboard_plugins'):
-#     print(entry_point.dist)
-#
-
+# %%
+# %%
 """improove early stopping """
-#model.save("dataaug_luz.h5")
+#model.save("prot.h5")
 
-#model = keras.models.load_model("./dataaug_luz.h5"
+#model = keras.models.load_model("./prot.h5", compile=False)
+
 
 with plt.style.context("ggplot"):
-	pd.DataFrame(history.history).plot()
-	plt.grid(True)
-	#plt.gca().set_ylim(-0.2, 1) # set the vertical range to [0-1] plt.show()
+	plt.plot(history.history['loss'], label='loss')
+	plt.plot(history.history['val_loss'], label='val_loss')
+
+	plt.yscale('log')
+	plt.ylabel('Loss')
+	plt.xlabel('Epochs')
+	plt.legend()
+	ax2 = plt.gca().twinx()
+	ax2.plot(history.history['lr'], color='r')
+	ax2.set_ylabel('lr',color='r')
+
+	plt.legend()
+
+# %%
+from tensor_val_utils import *
+
+def tensor_benchmark_model(
+	X, y, X_test, y_test, model, ref, **kwargs
+):
+	"""Final Output Function for pls regression"""
+	# get name of reference method for outputtable
+	print_nir_metrics(X, y, X_test, y_test, model, ref, **kwargs)
+	print("___Benchmarks___")
+	print_tensor_benchmark(X, y, X_test, y_test, model, **kwargs)
+	print("___MC dropout benchmarks___")
+	print_tensor_benchmark(X, y, X_test, y_test, model, **kwargs, mc_dropout = True)
+
+
+tensor_benchmark_model(**data, model = model, ref=ref)
+
+# %%
+mc_tensor_plot(**data, model = model)
+
+# %%
+"""improove early stopping """
+#model.save("prot.h5")
+
+#model = keras.models.load_model("./prot.h5", compile=False)
 
 
 with plt.style.context("ggplot"):
@@ -317,190 +261,37 @@ with plt.style.context("ggplot"):
 	plt.legend()
 
 
-benchmark(X_train, y_train, X_test, y_test, model)
 
 
+tensor_benchmark_model(**data, model = model, ref=ref)
 
-'''add a blue test set line???'''
-with plt.style.context("ggplot"):
-	plt.scatter(y_train, model.predict(X_train))
-	plt.scatter(y_test, model.predict(X_test))
-
-	plt.xlabel('measured')
-	plt.ylabel('predicted')
-	#plt.plot(y_train, y_train) # Y = PredY line
-	plt.plot([-2,3],[-2,3])
-	#plt.plot(y_test, y_test) # Y = PredY line
 
 # %% markdown
 # The "history" object returned by the training, contain the losses and learning rates from the training. The loss for the training and validation (here = Test) settles down when the lr is lowered. The model seems a bit overfit as the validation loss rises towards the end of training, maybe a higher dropout ratio could help.
 # %% codecell
-X_train.shape
-X_test.shape
 
-
-cv_bench(X_train, y_train, X_test, y_test, model)
-
-
-#################################
-##loading a reconstructed model##
-#################################
-
-'''Loading best Checkpoint with custom loss'''
+# loading a reconstructed model
+# Loading best Checkpoint with custom loss
 
 #reconstructed_model = keras.models.load_model('luz_XP', compile=False)
-reconstructed_model = keras.models.load_model(checkpoint_name, compile=False)
+reconstructed_model = keras.models.load_model('test_XA', compile=False)
 
 reconstructed_model.compile(loss=HuberLoss(), optimizer = keras.optimizers.Nadam(lr=0.001, beta_1=0.9, beta_2=0.999))
 
 
-'''reconstructed_model'''
-
-da_func2(X_train, y_train, X_test, y_test, model)
-
-
-def da_func2(X_train, y_train, X_test, y_test, model):
-	rmse = np.mean((y_train - model.predict(X_train).reshape(y_train.shape))**2)**0.5
-	rmse_test = np.mean((y_test - model.predict(X_test).reshape(y_test.shape))**2)**0.5
-	# hub = huber(y_train, model.predict(X_train))
-	# hub_test = huber(y_test, model.predict(X_test))
-	print ("RMSE  Train/Test\t%0.2F\t%0.2F"%(rmse, rmse_test))
-	# print ("Huber Train/Test\t%0.4F\t%0.4F"%(hub, hub_test))
-	print("\n")
-
-	#####################
-	#  pls cv here#
-	#####################
-	# get n_comps from fitted model
-	if hasattr(model, 'get_params')  == True:
-		params = model.get_params()
-		print('PLS model with:', params, 'components.')
-
-	#n_comp = params["n_components"]
-	# y_calibration estimate
-	y_c = model.predict(X_train)
-	# Cross-vali-predicted
-	y_cv = cross_val_predict(model, X_train, y_train, cv=10)
-	# Calculate scores for calibration and cross-validation
-	scores_c = r2_score(y_train, y_c)
-	scores_cv = r2_score(y_train, y_cv)
-
-	scores_cv2 = cross_val_score(model, X_train, y_train)
-	#sklearn cross_val_score
-	# Calculate mean square error for calibration and cross VALIDATION
-	mse_c = mean_squared_error(y_train, y_c)
-	m_cv = mean_squared_error(y_train, y_cv)
-
-	#####################
-	#  pls Test cv here#
-	#####################
-	# get n_comps from fitted model
-
-	#n_comp = params["n_components"]
-	# y_calibration estimate
-	y_c_test = model.predict(X_test)
-	# Cross-validation
-	y_cv_test = cross_val_predict(model, X_test, y_test, cv=10)
-	# Calculate scores for calibration and cross-validation
-	scores_c_test = r2_score(y_test, y_c_test)
-	scores_cv_test = r2_score(y_test, y_cv_test)
-	scores_cv_test2 = cross_val_score(model, X_test, y_test)
-	# Calculate mean square error for calibration and cross VALIDATION
-	mse_c_test = mean_squared_error(y_test, y_c_test)
-	mse_cv_test = mean_squared_error(y_test, y_cv_test)
-	#
-	# rmse_c_test = np.sqrt((mean_squared_error(y_test, y_c_test)))
-	# rmse_cv_test =np.sqrt((mean_squared_error(y_test, y_cv_test)))
-	hub_2 = huber(y_train, y_c)
-	hub_test_2 = huber(y_test, y_c_test)
-	hub_train_cv = huber(y_train, y_cv)
-	hub_test_cv = huber(y_test, y_cv_test)
-	print ("Huber2 Train/Test\t%0.4F\t%0.4F"%(hub_2, hub_test_2))
-	print ("HuberCV Train/Test\t%0.4F\t%0.4F"%(hub_train_cv, hub_test_cv))
-	# calc_metrics(X_train, y_train, X_test, y_test, model)
-
-	##################################
-	print('##################################')
-	##################################
-	print('R2 calib Train/Test\t%0.4F\t%0.4F'%(scores_c , scores_c_test))
-	print('R2 CV Train/Test\t%0.4F\t%0.4F'%(scores_cv , scores_cv_test))
-
-	print('R2 CV2 Train',scores_cv2)
-	print('R2 CV2mean Train',scores_cv2.mean())
-	print('R2 CV2sd Train',scores_cv2.std())
-	print('R2 CV2Test',scores_cv_test2)
-	print('MSE calib Train/Test\t%0.4F\t%0.4F'%(mse_c , mse_c_test))
-	print('MSE CV Train/Test\t%0.4F\t%0.4F'%(mse_cv , mse_cv_test))
-	#´print('RMSE calib Train/Test\t%0.4F\t%0.4F'%(rmse_c , reprmse_c_test))
-	#´print('RMSE CV Train/Test\t%0.4F\t%0.4F'%(rmse_cv , rmse_cv_test))
-
-
-	z = np.polyfit(y_train, y_cv, 1)
-	with plt.style.context(('ggplot')):
-		fig, ax = plt.subplots(figsize=(9,5))
-		ax.scatter(y_cv, y_train, edgecolors='k')
-		ax.scatter(y_cv_test, y_test, edgecolors='k')
-		ax.plot(z[1]+z[0]*y_train, y_train)
-		ax.plot(y_train,y_train)
-		plt.title('$R^{2}$ (CV):' + str(scores_cv))
-		plt.xlabel('Predicted $^{\circ}$Brix')
-		plt.ylabel('Measured $^{\circ}$Brix')
-
-		plt.show()
-
-
-
-'''Train reconstructed model'''
-
-history = reconstructed_model.fit(X_aug, y_aug, epochs = 50, batch_size=16, validation_data=(X_test, y_test), callbacks=[rdlr, checkpoint_cb, custom_stopper, tensorboard_cb])
-
-# oberseving similiar effekt to double cross validation
-'''add a blue test set line???'''
-with plt.style.context("ggplot"):
-	plt.scatter(y_train, model.predict(X_train))
-	plt.scatter(y_test, model.predict(X_test))
-	plt.scatter(y_val, model.predict(X_val))
-	#plt.scatter(y, reconstructed_model.predict(X))
-	plt.xlabel('measured')
-	plt.ylabel('predicted')
-	#plt.plot(y_train, y_train) # Y = PredY line
-	plt.plot([-2,3],[-2,3])
-	# plt.plot(y_test, y_test) # Y = PredY line
-
-
-
-'''add a blue test set line???'''
-with plt.style.context("ggplot"):
-	plt.scatter(y_train, reconstructed_model.predict(X_train))
-	plt.scatter(y_test, reconstructed_model.predict(X_test))
-	#plt.scatter(y_val, model.predict(X_val))
-	#plt.scatter(y, reconstructed_model.predict(X))
-	plt.xlabel('protein_measured')
-	plt.ylabel('protein_predicted')
-	# plt.plot(y_test, y_test) # Y = PredY line
-	plt.plot([-2,3],[-2,3])
 
 
 
 
+mc_tensor_plot(**data, model = reconstructed_model, errorbar=True)
 
+
+
+tensor_benchmark_model(**data, model = reconstructed_model, ref=ref)
 
 
 # %% codecell
 
-benchmark(X_train, y_train, X_test, y_test, model, X_val, y_val)
-
-
-'''reconstructed_model'''
-benchmark(X_train, y_train, X_test, y_test, reconstructed_model, X_val, y_val)
-
-
-
-
-
-SEP(X_train, y_train, model)
-
-SEC(X_train, y_train, model)
 
 # %% markdown
 # Saved output from benchmark fuction

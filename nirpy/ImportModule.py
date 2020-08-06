@@ -9,7 +9,7 @@ def plot_spec(wave_number, X):
     fig, ax = plt.subplots()
     with plt.style.context(("ggplot")):
         plt.plot(wave_number, X.T)
-        ax.set_xlim(wave_number.max(), wave_number.min())  # decreasing time
+        ax.set_xlim(wave_number.max(), wave_number.min())  # decreasing
         ax.set_xlabel("Wavenumber (cm-1)")
         ax.set_ylabel("Absorbance spectra")
         ax.grid(True)

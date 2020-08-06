@@ -2,15 +2,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import metrics
 from sklearn.metrics import make_scorer, mean_squared_error, r2_score
-from sklearn.model_selection import (cross_val_predict, cross_val_score,
-                                     cross_validate)
+from sklearn.model_selection import cross_val_predict, cross_val_score, cross_validate
+from ScoreUtils import huber_loss, root_mean_squared_error, standard_error_calibration, relative_prediction_deviation, standard_error_prediction, standard_error_cross_validation
 
-from ScoreLossesUtils import (huber_loss, relative_prediction_deviation,
-                              root_mean_squared_error,
-                              standard_error_calibration,
-                              standard_error_cross_validation,
-                              standard_error_prediction)
 
+def cv_benchmark_model(X, y, X_test, y_test, model, y_unscaled, ref, cv=10, **kwargs):
+    """Final Output Function for pls regression"""
+    # get name of reference method for outputtable
+    print_nir_metrics(X, y, X_test, y_test, model, y_unscaled, ref)
+    print_regression_benchmark(X, y, X_test, y_test, model)
+    # print crosstable
+    print_cv_table(X, y, X_test, y_test, model, cv)
 
 ##############################
 #### CV Metric Functions #####
@@ -25,14 +27,14 @@ def _create_score_list():
         ("Variance expl.:", make_scorer(metrics.explained_variance_score))
     )
     score_list.append(("R2:", make_scorer(r2_score)))
-    score_list.append(("Huber Loss:", make_scorer(huber_loss)))
     score_list.append(("MSE:", make_scorer(mean_squared_error)))
     score_list.append(("RMSE:", make_scorer(root_mean_squared_error)))
+    score_list.append(("Huber Loss:", make_scorer(huber_loss)))
     return score_list
 
 
 # cross validation on trained model
-def _calculate_cv_scores(X, y, model, score_list, cv=10):
+def _calculate_cv_scores(X, y, model, score_list, cv):
     "stores crossvalidation results in a list"
     results = []
     names = []
@@ -54,8 +56,8 @@ def _calculate_cv_scores(X, y, model, score_list, cv=10):
             )
         )
 
-        results_mean.append((cv_results["test_score"].mean().round(5)))
-        results_std.append((cv_results["test_score"].std().round(5)))
+        results_mean.append((cv_results["test_score"].mean().round(3)))
+        results_std.append((cv_results["test_score"].std().round(3)))
 
     return results, names, results_mean, results_std
 
@@ -63,23 +65,22 @@ def _calculate_cv_scores(X, y, model, score_list, cv=10):
 # output function
 
 
-def print_cv_table(X, y, X_test, y_test, model, **kwargs):
+def print_cv_table(X, y, X_test, y_test, model, cv = 10, **kwargs):
     """unpacks results and names from _calculate_cv_scores"""
     score_list = _create_score_list()
     # cv_predict list of scores and store
     # list definition in _calculate_cv_scores function
     train_results, score_name, train_mean, train_std = _calculate_cv_scores(
-        X, y, model, score_list
+        X, y, model, score_list, cv=cv
     )
 
     test_results, score_name, test_mean, test_std = _calculate_cv_scores(
-        X_test, y_test, model, score_list
+        X_test, y_test, model, score_list, cv=cv
     )
     # print header for table
-    print("Mean score and the 95`%` confidence interval from 10 fold CV")
     print(
-        "{:^15}{:<4}{:^2}{:<5}{:>10}{:^2}{:>3}".format(
-            "Scores", " ", " train ", " ", " ", "test", " "
+        "{:<15}{:<4}{:^5}{:<5}{:>10}{:^5}{:>3}".format(
+            "CV Scores", "train", " ", " ", "test", " ", " "
         )
     )
     # print table
@@ -91,11 +92,14 @@ def print_cv_table(X, y, X_test, y_test, model, **kwargs):
                 name, mean_1, " ± ", std_1 * 2, mean_2, " ± ", std_2 * 2
             )
         )
+    print("Mean ± 95`%` confidence interval",cv,"-fold CV.")
 
 
 # score function (not cross validated)
 
-
+##############################
+#### Reg Metric Functions ####
+##############################
 def calculate_regression_benchmarks(X, y, model):
     # y_calibration estimate
     y_c = model.predict(X)
@@ -122,11 +126,11 @@ def print_regression_benchmark(X, y, X_test, y_test, model):
         score_test,
     ) = calculate_regression_benchmarks(X_test, y_test, model)
     # printing
-    print("{:^10}\t{}\t\t{}".format("Validation", "train", "test"))
-    print("R2 calib\t\t{:.3}\t\t{:.3}".format(score_c, score_test))
-    print("MSE calib\t\t{:.3}\t\t{:.3}".format(mse_c, mse_c_test))
-    print("RMSE calib\t\t{:.3}\t\t{:.3}".format(np.sqrt(mse_c), np.sqrt(mse_c_test)))
-    print("Huber\t\t\t{:.3}\t\t{:.3}".format(hub, hub_test))
+    print("{:<9}\t{:^5}\t\t{:^5}".format("Scores", "train", "test"))
+    print("{:<9}\t{:.3}\t\t{:.3}".format("R2", score_c, score_test))
+    print("{:<9}\t{:.3}\t\t{:.3}".format("MSE", mse_c, mse_c_test))
+    print("{:<9}\t{:.3}\t\t{:.3}".format("RMSE", np.sqrt(mse_c), np.sqrt(mse_c_test)))
+    print("{:<9}\t{:.3}\t\t{:.3}".format("Huber", hub, hub_test))
 
 
 def print_nir_metrics(X, y, X_test, y_test, model, y_unscaled, ref, **kwargs):
@@ -139,40 +143,30 @@ def print_nir_metrics(X, y, X_test, y_test, model, y_unscaled, ref, **kwargs):
     rpd = relative_prediction_deviation(X, y, y_unscaled, model)
     # pls model meta_data
     n_comp = model.get_params()["n_components"]
-    print("Summary Reference Method:", ref)
-    print("Number of Principal Components:", n_comp)
+    print("*** Summary Reference Method:", ref, "***")
+    print("Number of latent variables:", n_comp)
+    print("Number of wavelengths:", X.shape[1])
     print("Number of training sampels:", y.shape[0])
     print("Number of test sampels:", y_test.shape[0])
     # nir metrics
-    print("NIR Metrics")
-    print("Standard Error of Calibration (SEC): \t{:.3}".format(sec_train))
-    print("Standard error of Prediction (SEP): \t{:.3}".format(sep_test))
-    print(
-        "Standard error of cross-validatoin (SECV): \t{:.3}± {:.3}".format(
-            secv_mean, secv_std * 2
-        )
-    )
-    print("RPD \t{:.3}".format(rpd))
+    print("*** NIR Metrics ***")
+    print("Standard Error Calibration (SEC): \t{:.3}".format(sec_train))
+    print("Standard Error Prediction (SEP): \t{:.3}".format(sep_test))
+    print("Standard Error CV (SECV): \t{:.4} ± {:.3}".format(secv_mean, secv_std * 2))
+    print("Relative prediction deviation (RPD): \t{:.3}".format(rpd))
 
-
-def cv_benchmark_model(X, y, X_test, y_test, model, y_unscaled, ref, **kwargs):
-    """Final Output Function for pls regression"""
-    # get name of reference method for outputtable
-    print_nir_metrics(X, y, X_test, y_test, model, y_unscaled, ref)
-    print_regression_benchmark(X, y, X_test, y_test, model, y_unscaled, ref)
-    # print crosstable
-    print_cv_table(X, y, X_test, y_test, model)
 
 
 def val_regression_plot(X, y, X_test, y_test, model, **kwargs):
     """regression plot showing cross-val estimates for train & test data"""
+
     y_cv = cross_val_predict(model, X, y)
     y_cv_test = cross_val_predict(model, X_test, y_test)
     z = np.polyfit(y, y_cv, 1)
     with plt.style.context(("ggplot")):
         fig, ax = plt.subplots(figsize=(9, 5))
-        ax.scatter(y_cv, y, edgecolors="k")
-        ax.scatter(y_cv_test, y_test, edgecolors="k")
+        ax.scatter(y_cv, y, edgecolors="k", label="train")
+        ax.scatter(y_cv_test, y_test, edgecolors="k", label="test")
         ax.plot(z[1] + z[0] * y, y)
         ax.plot(y, y)
         plt.title(
@@ -180,6 +174,7 @@ def val_regression_plot(X, y, X_test, y_test, model, **kwargs):
         )
         plt.xlabel("Predicted")
         plt.ylabel("Measured")
+        ax.legend()
 
         plt.show()
 
