@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import seaborn as sns
 import matplotlib.pyplot as plt
 
 
@@ -82,9 +81,7 @@ def importLuzCol(specs, lab, lab_col=4):
         if c
         not in ["Code", "Sorte", "Jahr", "Aufwuchs", "Sorte.1", "Beobachtung", "Stück"]
     ]
-    # visualize data
-    # sns.pairplot(lab[lab_values], diag_kind="kde")
-    # set lab classes
+
     lab_class = [
         c
         for c in lab.columns.values
@@ -137,9 +134,7 @@ def sel_wavs(specs, lab, sel_feats, lab_col=4):
         if c
         not in ["Code", "Sorte", "Jahr", "Aufwuchs", "Sorte.1", "Beobachtung", "Stück"]
     ]
-    # visualize data
-    # sns.pairplot(lab[lab_values], diag_kind="kde")
-    # set lab classes
+
     lab_class = [
         c
         for c in lab.columns.values

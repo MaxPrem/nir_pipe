@@ -15,8 +15,8 @@ from ValidationUtils import (cv_benchmark_model, print_cv_table, val_regression_
 # impor data
 
 # specs = pd.read_csv('./luzrawSpectra/nirMatrix.csv') # cut spectra
-specs = pd.read_csv("/Users/maxprem/nirPy/calData_full.csv")  # full spectra
-lab = pd.read_excel("/Users/maxprem/nirGit/nirpy/luzrawSpectra/labData.xlsx")
+specs = pd.read_csv("../calData_full.csv")  # full spectra
+lab = pd.read_excel("../luzrawSpectra/labData.xlsx")
 # input wavenumber to cut spectra
 specs = cut_specs(specs, 4100, 5500)
 

@@ -148,14 +148,6 @@ def optimal_n_comp(X, y, n_comp=15, plot=True, **kwargs):
             ].mean()
         )
 
-    #     # generate % value to print update
-    #     completed = 100 * (i + 1) / 40
-    #     # Trick to updata status on the same line
-    #     stdout.write("\r{:.3} completed".format(completed))
-    #     stdout.flush()
-    # stdout.write("\n")
-
-    # one component before mse minimum
     opt_n_comp = np.argmin(mse) - 1
 
     stdout.write("\n")

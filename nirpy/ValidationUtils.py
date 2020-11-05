@@ -5,7 +5,7 @@ from sklearn.metrics import make_scorer, mean_squared_error, r2_score
 from sklearn.model_selection import cross_val_predict, cross_val_score, cross_validate
 from ScoreUtils import huber_loss, root_mean_squared_error, standard_error_calibration, relative_prediction_deviation, standard_error_prediction, standard_error_cross_validation
 
-
+# prints validation output table
 def cv_benchmark_model(X, y, X_test, y_test, model, y_unscaled, ref, cv=10, **kwargs):
     """Final Output Function for pls regression"""
     # get name of reference method for outputtable

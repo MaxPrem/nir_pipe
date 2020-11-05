@@ -96,6 +96,7 @@ class GlobalStandardScaler(object):
 
 class SavgolFilter(FunctionTransformer):
 	"""Performs Savgol smooting, by fitting a polynomial curve to a window of n wavelenghts"""
+
 	def __init__(self, window_length=13, polyorder=2, deriv=0):
 		# set parameters
 		self.window_length = window_length

@@ -3,9 +3,7 @@ import os
 import time
 
 import matplotlib.pyplot as plt
-
 import numpy as np
-
 import pandas as pd
 import pkg_resources
 import scipy.io as sio
@@ -14,9 +12,9 @@ import tensorflow as tf
 import tensorflow.keras as keras
 import tensorflow.keras.losses
 from keras.wrappers.scikit_learn import KerasRegressor
-
+from sklearn import metrics
 from sklearn.model_selection import (cross_val_predict, cross_val_score,
-                                     train_test_split)
+                                     train_test_split, KFold)
 from sklearn.pipeline import Pipeline
 from tensorflow.keras import backend as K
 from tensorflow.keras.callbacks import (EarlyStopping, ModelCheckpoint,
@@ -24,12 +22,14 @@ from tensorflow.keras.callbacks import (EarlyStopping, ModelCheckpoint,
 from tensorflow.keras.layers import (Conv1D, Dense, Dropout, Flatten,
                                      GaussianNoise, Reshape, SeparableConv1D)
 from tensorflow.keras.models import Sequential, load_model, save_model
-from ChemUtils import (Dataaugument, EmscScaler, GlobalStandardScaler)
-from DeepUtils import CustomStopper, HuberLoss, MCDropout
-from ImportModule import cut_specs, importLuzCol
-import tensorflow as tf
 
-from ValidationUtils import benchmark, val_regression_plot, print_nir_metrics, cv_benchmark_model
+from nirpy.ChemUtils import Dataaugument, EmscScaler, GlobalStandardScaler
+from nirpy.DeepUtils import CustomStopper, HuberLoss, MCDropout
+from nirpy.ImportModule import cut_specs, importLuzCol
+from nirpy.ValidationUtils import (benchmark, cv_benchmark_model,
+                                   print_nir_metrics, val_regression_plot)
+from nirpy.ScoreUtils import huber_loss
+from TensorValUtils import mc_benchmarks
 
 assert tf.__version__ >= "2.0"
 print(tf.__version__)
@@ -56,7 +56,7 @@ tensorboard_cb = keras.callbacks.TensorBoard(run_logdir)
 
 for entry_point in pkg_resources.iter_entry_points('tensorboard_plugins'):
 	print(entry_point.dist)
-X_aug.shape
+
 
 # %%
 
@@ -120,20 +120,22 @@ def create_model():
 
     model.compile(loss=HuberLoss(), optimizer = keras.optimizers.Nadam(lr=0.001, beta_1=0.9, beta_2=0.999))
     return model
+# %%
+ mc_benchmarks()
+
+
 
 # %%
-
-from sklearn import metrics
-from ScoreUtils import huber_loss
-huber_score = metrics.make_scorer(huber_loss)
-# evaluate model with standardized dataset
-estimator = KerasRegressor(build_fn=create_model, epochs=45, batch_size=16, verbose=0)
-kfold = KFold(n_splits=5, shuffle=True)
-
-results = cross_val_score(estimator, X_aug, y_aug, cv=kfold, scoring=huber_score )
-results
-print("HuberScore: %.2f%% (%.2f%%)" % (results.mean()*100, results.std()*100))
-
+#
+# huber_score = metrics.make_scorer(huber_loss)
+# # evaluate model with standardized dataset
+# estimator = KerasRegressor(build_fn=create_model, epochs=45, batch_size=16, verbose=0)
+# kfold = KFold(n_splits=5, shuffle=True)
+#
+# results = cross_val_score(estimator, X_aug, y_aug, cv=kfold, scoring=huber_score )
+# results
+# print("HuberScore: %.2f%% (%.2f%%)" % (results.mean()*100, results.std()*100))
+#
 
 
 # compile model#
@@ -144,7 +146,6 @@ print("HuberScore: %.2f%% (%.2f%%)" % (results.mean()*100, results.std()*100))
 
 # %%
 
- %%
 # trying mc DROPOUT
 
  # force training mode = dropout on  # force training mode = dropout on

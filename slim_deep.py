@@ -40,13 +40,13 @@ print(tf.__version__)
 
 # %%codecell
 #specs = pd.read_csv('./nirpy/luzrawSpectra/nirMatrix.csv')
-specs = pd.read_csv('/Users/maxprem/nirPy/calData_full.csv') # full
-lab = pd.read_excel('./nirpy/luzrawSpectra/labdata.xlsx')
+specs = pd.read_csv('./calData_full.csv') # full
+lab = pd.read_excel('./luzrawSpectra/labdata.xlsx')
 
 
 specs = cut_specs(specs, 4100, 8000)
 
-X, y, wl, ref = importLuzCol(specs, lab, 1)
+X, y, wl, ref = importLuzCol(specs, lab, 4)
 
 # %%
 
@@ -64,6 +64,7 @@ y = yscaler.fit_transform(y)
 y_test = yscaler.transform(y_test)
 y_val = yscaler.transform(y_val)
 
+y.shape
 y_test.shape
 y_val.shape
 
@@ -92,7 +93,7 @@ X.shape
 y.shape
 
 
-
+# Dictonary containg train test and validation data
 data = {"X": X, "y": y, "X_test": X_test, "y_test": y_test, "X_val": X_val, "y_val": y_val}
 
 
@@ -102,7 +103,7 @@ data = {"X": X, "y": y, "X_test": X_test, "y_test": y_test, "X_val": X_val, "y_v
 ###################################################
 ######## model initialization as funciton #########
 ###################################################
-def create_model():
+def create_model(input_dim):
 
 	# optimsed network shape of la
 	DENSE = 128
@@ -111,9 +112,6 @@ def create_model():
 	C1_S  = 32  #Width of the convolutional mini networks
 	C2_K  = 16
 	C2_S  = 32
-
-	#input
-	input_dim = X_aug.shape[1]
 
     # activatoin function
 	leaky_relu = keras.layers.LeakyReLU(alpha=0.2)
@@ -140,7 +138,10 @@ def create_model():
 	model.compile(loss=HuberLoss(), optimizer = keras.optimizers.Nadam(lr=0.001, beta_1=0.9, beta_2=0.999))
 	return model
 
-model = create_model()
+# %%
+#input shape for network
+input_dim = X_aug.shape[1]
+model = create_model(input_dim)
 #compile model
 model.compile(loss=HuberLoss(), optimizer = keras.optimizers.Nadam(lr=0.001, beta_1=0.9, beta_2=0.999))
 
@@ -148,8 +149,8 @@ model.summary()
 
 
 # %%
-checkpoint_name = "test_XA"
-run_id_tensor_board = "run_%Y_%m_%d-%H_%M_%S_test_XA"
+checkpoint_name = "test_XB"
+run_id_tensor_board = "run_%Y_%m_%d-%H_%M_%S_test_XB"
 
 # tensorboard
 def get_run_logdir():
@@ -288,60 +289,3 @@ mc_tensor_plot(**data, model = reconstructed_model, errorbar=True)
 
 
 tensor_benchmark_model(**data, model = reconstructed_model, ref=ref)
-
-
-# %% codecell
-
-
-# %% markdown
-# Saved output from benchmark fuction
-#
-# TM
-# RMSE  Train/Test	0.87	0.91
-# Huber Train/Test	0.2522	0.2767
-#
-#
-# XA: Rohasche
-# RMSE  Train/Test	0.75	0.60 # data is containing outlier, PLS OUtlier loop removed 9 samples
-# Huber Train/Test	0.1734	0.1630
-#
-#
-# RMSE  Train/Test	0.19	0.19
-# Huber Train/Test	0.0215	0.0222
-#
-# # full spec - edges
-# RMSE  Train/Test	0.21	0.23
-# Huber Train/Test	0.0204	0.0296
-#
-# # XP part of the spec
-# RMSE  Train/Test	0.98	0.24
-# Huber Train/Test	0.3655	0.0202
-#
-#
-# 'reconstructed_model' selu batch norm ...
-# RMSE  Train/Test	0.12	0.15
-# Huber Train/Test	0.0077	0.0108
-#
-# XP: Nadam 70 epochs
-# RMSE  Train/Test	0.04	0.30
-# Huber Train/Test	0.0009	0.0418
-#
-#
-# XP: 100 epochs, use dataaug on validation_data
-# and retrain for 2 epocks
-# &seperabl   Conv
-#
-#
-# RMSE  Train/Test	0.22	0.34
-# Huber Train/Test	0.0228	0.0532
-#
-# XLP
-#
-# RMSE  Train/Test	0.54	0.74
-# Huber Train/Test	0.1249	0.2278
-# """
-#
-# """33 epochs
-#
-# RMSE  Train/Test	0.21	0.36
-# Huber Train/Test	0.0214	0.0576

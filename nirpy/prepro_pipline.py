@@ -19,9 +19,7 @@ specs = cut_specs(specs, 4100, 5500)
 # specs = cut_specs(specs, 4100, 5500)
 
 # %%
-lab
-lab.set_index("Code").sort_index()
-lab["Code"]
+
 # assing spectra and refernce method
 
 
